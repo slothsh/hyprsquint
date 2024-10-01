@@ -2,7 +2,7 @@
 name = "hyprsquint"
 authors = ["slothsh"]
 commit_pins = [
-    ["0f594732b063a90d44df8c5d402d658f27471dfe", "dfd8ce31d030044fbf8d98bd8e08adf12c1c6ed5"]
+    ["0f594732b063a90d44df8c5d402d658f27471dfe", "cad9bab701a5ec1e05c356b2c058784b45134a84"]
 ]
 
 [hyprsquint]
