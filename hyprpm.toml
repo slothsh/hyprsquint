@@ -1,0 +1,11 @@
+[repository]
+name = "hyprsquint"
+authors = ["slothsh"]
+
+[hyprsquint]
+description = "A Hyprland plugin for magnifying your screen."
+authors = ["slothsh"]
+output = "hyprsquint.so"
+build = [
+    "bash build.sh"
+]
