@@ -1,6 +1,9 @@
 [repository]
 name = "hyprsquint"
 authors = ["slothsh"]
+commit_pins = [
+    ["0f594732b063a90d44df8c5d402d658f27471dfe", "4406202b16e3b1635a520c3ba56f22d853f5c257"]
+]
 
 [hyprsquint]
 description = "A Hyprland plugin for magnifying your screen."
