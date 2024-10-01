@@ -8,7 +8,7 @@ commit_pins = [
 [hyprsquint]
 description = "A Hyprland plugin for magnifying your screen."
 authors = ["slothsh"]
-output = "hyprsquint.so"
+output = "build/hyprsquint.so"
 build = [
     "bash build.sh"
 ]
