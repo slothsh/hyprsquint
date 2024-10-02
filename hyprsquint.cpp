@@ -8,6 +8,7 @@
 #include <hyprland/src/helpers/Color.hpp>
 #include <hyprland/src/devices/IPointer.hpp>
 #include <hyprland/src/SharedDefs.hpp>
+#include <hyprlang.hpp>
 
 // Project
 #include "globals.hpp"
@@ -41,8 +42,10 @@ static void handleMouseAxisEvent([[maybe_unused]] void* handle, [[maybe_unused]]
 
     if (user_args.contains("event")) {
         const auto scroll = std::any_cast<IPointer::SAxisEvent>(user_args.at("event"));
+        const auto invert = *static_cast<bool*>(*HyprlandAPI::getConfigValue(HYPR_HANDLE, "plugin:hyprsquint:invert_scroll")->getDataStaticPtr());
         ZOOM_STATE.last_delta = scroll.delta;
-        ZOOM_STATE.zoom = std::clamp(ZOOM_STATE.zoom - scroll.delta/DEFAULT_SCROLL_DELTA/2.0, 1.0, 24.0);
+        const auto delta = scroll.delta/DEFAULT_SCROLL_DELTA/2.0; 
+        ZOOM_STATE.zoom = std::clamp(ZOOM_STATE.zoom - ((invert) ? -delta : delta), 1.0, 24.0);
         ZOOM_STATE.last_delta = scroll.delta;
         HyprlandAPI::invokeHyprctlCommand("keyword", std::format("cursor:zoom_factor {:.2}", ZOOM_STATE.zoom));
     }
@@ -79,11 +82,14 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
     HyprlandAPI::addDispatcher(HYPR_HANDLE, "hyprsquint:squint", onSquintHandler);
 
+    HyprlandAPI::addConfigValue(HYPR_HANDLE, "plugin:hyprsquint:invert_scroll", Hyprlang::INT{0});
+    HyprlandAPI::reloadConfig();
+
     return {
         "hyprsquint",
         "A Hyprland plugin for magnifying your screen.",
         "slothsh",
-        "0.0.1",
+        "0.0.2",
     };
 }
 
