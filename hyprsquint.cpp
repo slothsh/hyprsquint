@@ -8,6 +8,7 @@
 #include <hyprland/src/helpers/Color.hpp>
 #include <hyprland/src/devices/IPointer.hpp>
 #include <hyprland/src/SharedDefs.hpp>
+#include <hyprland/src/config/ConfigValue.hpp>
 #include <hyprlang.hpp>
 
 // Project
@@ -29,26 +30,26 @@ static ZoomState ZOOM_STATE {};
 
 [[maybe_unused]] static constexpr int DEFAULT_SCROLL_DELTA = 15;
 
-static void handleMouseAxisEvent([[maybe_unused]] void* handle, [[maybe_unused]] SCallbackInfo& callback_info, [[maybe_unused]] std::any args) {
-    const auto user_args = std::any_cast<EventMap>(args);
-
+static void hookMouseAxis([[maybe_unused]] IPointer::SAxisEvent event) {
     if (!ZOOM_STATE.enabled) {
         ZOOM_STATE.enabled = false;
         ZOOM_STATE.zoom = 1.0;
         ZOOM_STATE.last_delta = 0.0;
         HyprlandAPI::invokeHyprctlCommand("keyword", std::format("cursor:zoom_factor {:.2}", 1.0));
+        (*(OriginalMouseAxis)MOUSE_AXIS_HOOK->m_pOriginal)(event);
         return;
     }
 
-    if (user_args.contains("event")) {
-        const auto scroll = std::any_cast<IPointer::SAxisEvent>(user_args.at("event"));
-        const auto invert = *static_cast<bool*>(*HyprlandAPI::getConfigValue(HYPR_HANDLE, "plugin:hyprsquint:invert_scroll")->getDataStaticPtr());
-        ZOOM_STATE.last_delta = scroll.delta;
-        const auto delta = scroll.delta/DEFAULT_SCROLL_DELTA/2.0; 
-        ZOOM_STATE.zoom = std::clamp(ZOOM_STATE.zoom - ((invert) ? -delta : delta), 1.0, 24.0);
-        ZOOM_STATE.last_delta = scroll.delta;
-        HyprlandAPI::invokeHyprctlCommand("keyword", std::format("cursor:zoom_factor {:.2}", ZOOM_STATE.zoom));
-    }
+    // Yoinked from hyprland/src/managers/input/InputManager.cpp:CInputManager::onMouseWheel()
+    static auto PINPUTSCROLLFACTOR = CConfigValue<Hyprlang::FLOAT>("input:scroll_factor");
+    static auto PTOUCHPADSCROLLFACTOR = CConfigValue<Hyprlang::FLOAT>("input:touchpad:scroll_factor");
+    auto factor = (*PTOUCHPADSCROLLFACTOR <= 0.f || event.source == WL_POINTER_AXIS_SOURCE_FINGER ? *PTOUCHPADSCROLLFACTOR : *PINPUTSCROLLFACTOR);
+    double delta = event.delta * factor;
+    const auto invert = *static_cast<bool*>(*HyprlandAPI::getConfigValue(HYPR_HANDLE, "plugin:hyprsquint:invert_scroll")->getDataStaticPtr());
+    const auto squintDelta = delta/DEFAULT_SCROLL_DELTA; 
+    ZOOM_STATE.zoom = std::clamp(ZOOM_STATE.zoom - ((invert) ? -squintDelta : squintDelta), 1.0, 24.0);
+    ZOOM_STATE.last_delta = delta;
+    HyprlandAPI::invokeHyprctlCommand("keyword", std::format("cursor:zoom_factor {:.2}", ZOOM_STATE.zoom));
 }
 
 static void onSquintHandler(std::string arg) {
@@ -78,7 +79,14 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
         throw std::runtime_error("[hyprsquint] Version mismatch");
     }
 
-    MOUSE_AXIS_CALLBACK = HyprlandAPI::registerCallbackDynamic(HYPR_HANDLE, "mouseAxis", &handleMouseAxisEvent);
+    static auto const METHODS = HyprlandAPI::findFunctionsByName(HYPR_HANDLE, "onMouseWheel");
+    MOUSE_AXIS_HOOK = HyprlandAPI::createFunctionHook(HYPR_HANDLE, METHODS[0].address, reinterpret_cast<void*>(&hookMouseAxis));
+    if (!MOUSE_AXIS_HOOK) {
+        HyprlandAPI::addNotification(HYPR_HANDLE, "[hyprsquint] Could not bind mouseAxis hook!",
+                                     CColor{1.0, 0.2, 0.2, 1.0}, 5000);
+        throw std::runtime_error("[hyprsquint] Could not bind mouseAxis hook!");
+    }
+    MOUSE_AXIS_HOOK->hook();
 
     HyprlandAPI::addDispatcher(HYPR_HANDLE, "hyprsquint:squint", onSquintHandler);
 
@@ -89,7 +97,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
         "hyprsquint",
         "A Hyprland plugin for magnifying your screen.",
         "slothsh",
-        "0.0.2",
+        "0.0.3",
     };
 }
 
